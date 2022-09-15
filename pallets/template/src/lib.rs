@@ -1,102 +1,111 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/reference/frame-pallets/>
-pub use pallet::*;
-
-#[cfg(test)]
-mod mock;
-
-#[cfg(test)]
-mod tests;
-
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
+pub use frame_system::pallet::*;
+// use codec::{Encode, Decode};
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
+	use core::u32;
 
+use frame_support::{pallet_prelude::{*, OptionQuery}, StorageMap, Blake2_128Concat};
+	use frame_system::pallet_prelude::*;
+	use frame_support::inherent::Vec;
+	
+
+// use sp_io::transaction_index::index;
+	
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
+	// #[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
-
-	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type Provider: DataProvider<Key = u32, Data = Vec<u8>>;
+		// fn store_esg(&self) -> Vec<u8>;
 	}
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn Data)]
+	// pub type CompanyNameStorage<T:Config> = StorageMap <_, u32, Vec<u8>, OptionQuery>;
+	pub(super) type CompanyNameStorage<T: Config> = StorageMap <_, 
+		Blake2_128Concat,
+	 	key: u32, 
+	 	data: Vec<u8>, 
+	 	OptionQuery>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
+	
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
+		ESGStored(u32, Vec<u8>, T::AccountId),
+
 	}
 
-	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
 		NoneValue,
-		/// Errors should have helpful documentation associated with them.
 		StorageOverflow,
 	}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
-			let who = ensure_signed(origin)?;
-
-			// Update storage.
-			<Something<T>>::put(something);
-
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
-			// Return a successful DispatchResultWithPostInfo
+		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		#[pallet::weight(0)]		
+		pub fn esgscore(origin: OriginFor<T>, Key: u32, Data: Vec<u8>) -> DispatchResult {
+		
+			let signer = ensure_signed(origin)?;
+	
+			<CompanyNameStorage<T>>::insert( Key, Data);
+			// <CompanyNameStorage::get();
+		
+			Self::deposit_event(Event::ESGStored(Key, Data, signer.clone()));
+			
+			
 			Ok(())
+
 		}
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+		// #[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
+		// pub fn name_error(origin: OriginFor<T>) -> DispatchResult {
+		// 	let _who = ensure_signed(origin)?;
 
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => return Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
+		// 	match <CompanyNameStorage<T>>::get() {
+		// 		// Return an error if the value has not been set.
+		// 		None => return Err(Error::<T>::NoneValue.into()),
+		// 		Some(_old) => return Err(Error::<T>::StorageOverflow.into()),
+					
+					
+		// 	}
+		// }
+
+	}
+
+
+
+	pub trait DataProvider {
+		// type Key = u32;
+		// type Data = Vec<u8>;
+		type Key;
+		type Data;
+	 
+		fn query(key: u32) -> Option<Vec<u8>>;
+	}
+
+	impl<T: Config> DataProvider for Pallet<T> {
+		// type Key = T::Index;
+		// type Data = T::Data;
+	 
+		fn query(key: u32) -> Option<Vec<u8>> {
+			CompanyNameStorage::<T>::get(&key)
 		}
 	}
+
+
+	
 }
+
+
+	
+                                                                                                        
+	
+
